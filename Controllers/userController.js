@@ -2,7 +2,6 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Inscription
 module.exports.SignUp = async (req, res) => {
     const { username, password } = req.body;
 
@@ -13,18 +12,17 @@ module.exports.SignUp = async (req, res) => {
     try {
         const existingUser = await User.findOne({ username });
         if (existingUser) {
-            return res.status(400).json({ message: 'Nom d’utilisateur déjà pris.' });
+            return res.status(400).json({ message: 'Nom d’utilisateur déjà pris' });
         }
 
         const user = new User({ username, password });
         const addedUser = await user.save();
-        res.status(201).json({ message: 'Utilisateur créé avec succès.', user: addedUser });
+        res.status(201).json({ message: 'creation d utilisateur avec succès.', user: addedUser });
     } catch (error) {
         res.status(500).json({ message: 'Erreur lors de l’inscription.', error });
     }
 };
 
-// Connexion
 module.exports.SignIn = async (req, res) => {
     const { username, password } = req.body;
 
@@ -50,7 +48,6 @@ module.exports.SignIn = async (req, res) => {
     }
 };
 
-// Endpoint protégé
 module.exports.endpoint = (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
 
