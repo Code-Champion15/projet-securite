@@ -3,19 +3,19 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 module.exports.SignUp = async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!username || !password) {
-        return res.status(400).json({ message: 'Nom d’utilisateur et mot de passe requis.' });
+    if (!email || !password) {
+        return res.status(400).json({ message: 'email et mot de passe requis.' });
     }
 
     try {
-        const existingUser = await User.findOne({ username });
+        const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ message: 'Nom d’utilisateur déjà pris' });
+            return res.status(400).json({ message: 'email déjà pris' });
         }
 
-        const user = new User({ username, password });
+        const user = new User({ email, password });
         const addedUser = await user.save();
         res.status(201).json({ message: 'creation d utilisateur avec succès.', user: addedUser });
     } catch (error) {
@@ -24,14 +24,14 @@ module.exports.SignUp = async (req, res) => {
 };
 
 module.exports.SignIn = async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     if (!username || !password) {
-        return res.status(400).json({ message: 'Nom d’utilisateur et mot de passe requis.' });
+        return res.status(400).json({ message: 'Email et mot de passe requis.' });
     }
 
     try {
-        const user = await User.findOne({ username });
+        const user = await User.findOne({email });
         if (!user) {
             return res.status(404).json({ message: 'Utilisateur introuvable.' });
         }
