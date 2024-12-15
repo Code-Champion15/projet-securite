@@ -1,53 +1,108 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const nodemailer = require('nodemailer');
+const { sendVerificationEmail } = require('../utils/emailService');
+const { generateToken, verifyToken } = require('../utils/tokenService');
 
+// Inscription
 module.exports.SignUp = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-        return res.status(400).json({ message: 'email et mot de passe requis.' });
+        return res.status(400).json({ message: 'Email et mot de passe requis.' });
     }
 
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ message: 'email déjà pris' });
+            return res.status(400).json({ message: 'Email déjà pris.' });
         }
 
-        const user = new User({ email, password });
+        const hashedPassword = await bcrypt.hash(password,10);
+
+        const verificationToken = generateToken({ email }, '1d');
+
+        const user = new User({
+            email,
+            password: hashedPassword,
+            isVerified: false,
+            verificationToken,
+        });
         const addedUser = await user.save();
-        res.status(201).json({ message: 'creation d utilisateur avec succès.', user: addedUser });
+
+        const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+        await sendVerificationEmail(email, verificationLink);
+
+        res.status(201).json({ message: 'Utilisateur créé avec succès. Veuillez vérifier votre email.' });
     } catch (error) {
-        res.status(500).json({ message: 'Erreur lors de l’inscription.', error });
+        console.error(error);
+        res.status(500).json({ message: 'Erreur lors de l\'inscription.', error });
     }
 };
 
-module.exports.SignIn = async (req, res) => {
+// Vérification de l'email
+module.exports.verifyEmail = async (req, res) => {
+    const { token } = req.query;
+
+    if (!token) {
+        return res.status(400).json({ message: 'Token manquant.' });
+    }
+
+    try {
+        const decoded = verifyToken(token);
+        const user = await User.findOne({ email: decoded.email, verificationToken: token });
+
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé ou token invalide.' });
+        }
+
+        user.isVerified = true;
+        user.verificationToken = null;
+        await user.save();
+
+        res.status(200).json({ message: 'Email vérifié avec succès, vous pouvez maintenant vous connecter.' });
+    } catch (error) {
+        console.error(error);
+        res.status(400).json({ message: 'Token invalide ou expiré.', error });
+    }
+};
+
+// Connexion
+module.exports.Signin = async (req, res) => {
     const { email, password } = req.body;
 
-    if (!username || !password) {
+    if (!email || !password) {
         return res.status(400).json({ message: 'Email et mot de passe requis.' });
     }
 
     try {
-        const user = await User.findOne({email });
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(404).json({ message: 'Utilisateur introuvable.' });
         }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!user.isVerified) {
+            return res.status(400).json({ message: 'Veuillez vérifier votre email avant de vous connecter.' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(req.body.password, user.password);
+        console.log('Password entered:', password); // Ajouté pour le débogage
+        console.log('Hashed password in DB:', user.password); // Ajouté pour le débogage
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Mot de passe incorrect.' });
         }
 
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = generateToken({ id: user._id }, '1h');
+        console.log('Generated JWT:', token);
         res.json({ message: 'Connexion réussie.', token });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: 'Erreur lors de la connexion.', error });
     }
 };
 
+// Endpoint protégé
 module.exports.endpoint = (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -56,10 +111,10 @@ module.exports.endpoint = (req, res) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = verifyToken(token);
         res.status(200).json({ message: 'Accès autorisé.', user: decoded });
     } catch (error) {
-        res.status(403).json({ message: 'Token invalide ou expiré.' });
+        console.error(error);
+        res.status(403).json({ message: 'Token invalide ou expiré.', error });
     }
 };
-
