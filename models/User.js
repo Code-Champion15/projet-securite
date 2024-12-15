@@ -6,13 +6,19 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'email requis.'],
         unique: true,
-        trim: true,
-        minlength: 3,
+    
     },
     password: {
         type: String,
         required: [true, 'mot de passe requis.'],
         minlength: 6,
+    },
+    isVerified: {
+        type:Boolean,
+        default: false
+    },
+    verificationToken: {
+        type: String
     },
 }, { timestamps: true });
 
